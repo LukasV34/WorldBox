@@ -2,12 +2,10 @@ import pygame
 import random
 import math
 
-# --- NASTAVENÍ ---
 WIDTH, HEIGHT = 1500, 1000
 CELL_SIZE = 10
 FPS = 30
 
-# --- BARVY ---
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
@@ -20,26 +18,108 @@ DARK_GREEN = (0, 100, 0)
 SAND = (194, 178, 128)
 PURPLE = (128, 0, 128)
 ORANGE = (255, 165, 0)
+DARK_GRAY = (50, 50, 50)
 
 
-# --- TŘÍDY ---
+class GameSettings:
+    def __init__(self):
+        self.initial_energy = 100
+        self.max_energy = 120
+        self.energy_loss = 1.6
+        self.energy_from_food = 35
+        self.food_search_radius = 3
+        self.reproduction_energy = 40
+        self.reproduction_chance = 0.08
+        self.reproduction_cost = 15
+        self.min_reproduction_age = 20
+        self.max_reproduction_age_ratio = 0.9
+        self.max_nearby_agents = 15
+        self.fight_chance = 0.3
+        self.fight_death_chance = 0.3
+        self.village_energy_cost = 30
+        self.village_build_cost = 15
+        self.village_build_chance = 0.005
+        self.village_min_distance = 6
+        self.initial_food = 400
+        self.max_food = 500
+        self.food_spawn_chance = 0.7
+        self.disaster_chance = 0.0001
+        self.meteor_radius = 3
+        self.human_max_age = 500
+        self.elf_max_age = 800
+        self.dwarf_max_age = 700
+        self.orc_max_age = 400
+        self.human_strength = 5
+        self.elf_strength = 4
+        self.dwarf_strength = 6
+        self.orc_strength = 7
+        self.human_speed = 1.0
+        self.elf_speed = 1.2
+        self.dwarf_speed = 1.4
+        self.orc_speed = 1.1
+
+
+settings = GameSettings()
+
+
+class Slider:
+    def __init__(self, x, y, w, h, min_val, max_val, initial_val, label, step=1):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.min_val = min_val
+        self.max_val = max_val
+        self.value = initial_val
+        self.label = label
+        self.step = step
+        self.dragging = False
+        self.handle_radius = 8
+
+    def draw(self, screen, font):
+        pygame.draw.rect(screen, DARK_GRAY, self.rect)
+        fill_width = int((self.value - self.min_val) / (self.max_val - self.min_val) * self.rect.width)
+        fill_rect = pygame.Rect(self.rect.x, self.rect.y, fill_width, self.rect.height)
+        pygame.draw.rect(screen, BLUE, fill_rect)
+        pygame.draw.rect(screen, WHITE, self.rect, 2)
+        handle_x = self.rect.x + fill_width
+        handle_y = self.rect.y + self.rect.height // 2
+        pygame.draw.circle(screen, YELLOW, (handle_x, handle_y), self.handle_radius)
+        pygame.draw.circle(screen, WHITE, (handle_x, handle_y), self.handle_radius, 2)
+        label_text = font.render(f"{self.label}: {self.value:.2f}", True, WHITE)
+        screen.blit(label_text, (self.rect.x, self.rect.y - 25))
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_pos = pygame.mouse.get_pos()
+            handle_x = self.rect.x + int((self.value - self.min_val) / (self.max_val - self.min_val) * self.rect.width)
+            handle_y = self.rect.y + self.rect.height // 2
+            if (abs(mouse_pos[0] - handle_x) < self.handle_radius and abs(
+                    mouse_pos[1] - handle_y) < self.handle_radius) or self.rect.collidepoint(mouse_pos):
+                self.dragging = True
+                self.update_value(mouse_pos[0])
+        elif event.type == pygame.MOUSEBUTTONUP:
+            self.dragging = False
+        elif event.type == pygame.MOUSEMOTION and self.dragging:
+            self.update_value(event.pos[0])
+
+    def update_value(self, mouse_x):
+        relative_x = mouse_x - self.rect.x
+        relative_x = max(0, min(self.rect.width, relative_x))
+        ratio = relative_x / self.rect.width
+        new_value = self.min_val + ratio * (self.max_val - self.min_val)
+        self.value = round(new_value / self.step) * self.step
+        self.value = max(self.min_val, min(self.max_val, self.value))
+
 
 class Terrain:
-    # Třída pro různé typy terénu
     GRASS = 0
     WATER = 1
     SAND = 2
     MOUNTAIN = 3
 
     def __init__(self):
-        # Konstruktor třídy - inicializuje terén
-        self.grid = [[Terrain.GRASS for _ in range(WIDTH // CELL_SIZE)]
-                     for _ in range(HEIGHT // CELL_SIZE)]
-        self.generate_terrain()  # Generování terénu
+        self.grid = [[Terrain.GRASS for _ in range(WIDTH // CELL_SIZE)] for _ in range(HEIGHT // CELL_SIZE)]
+        self.generate_terrain()
 
     def generate_terrain(self):
-        """Generuje náhodný terén s vodou, pískem a horami - méně překážek"""
-        # Přidání vodních ploch
         for _ in range(9):
             x = random.randint(20, WIDTH // CELL_SIZE - 20)
             y = random.randint(15, HEIGHT // CELL_SIZE - 15)
@@ -50,8 +130,6 @@ class Terrain:
                         nx, ny = x + dx, y + dy
                         if 0 <= nx < WIDTH // CELL_SIZE and 0 <= ny < HEIGHT // CELL_SIZE:
                             self.grid[ny][nx] = Terrain.WATER
-
-        # Přidání pouště
         for _ in range(6):
             x = random.randint(25, WIDTH // CELL_SIZE - 25)
             y = random.randint(20, HEIGHT // CELL_SIZE - 20)
@@ -63,8 +141,6 @@ class Terrain:
                         if 0 <= nx < WIDTH // CELL_SIZE and 0 <= ny < HEIGHT // CELL_SIZE:
                             if self.grid[ny][nx] != Terrain.WATER:
                                 self.grid[ny][nx] = Terrain.SAND
-
-        # Přidání hor
         for _ in range(15):
             x = random.randint(15, WIDTH // CELL_SIZE - 15)
             y = random.randint(15, HEIGHT // CELL_SIZE - 15)
@@ -72,42 +148,30 @@ class Terrain:
                 self.grid[y][x] = Terrain.MOUNTAIN
 
     def get_color(self, terrain_type):
-        """Vrací barvu podle typu terénu"""
-        colors = {
-            Terrain.GRASS: DARK_GREEN,
-            Terrain.WATER: BLUE,
-            Terrain.SAND: SAND,
-            Terrain.MOUNTAIN: GRAY
-        }
+        colors = {Terrain.GRASS: DARK_GREEN, Terrain.WATER: BLUE, Terrain.SAND: SAND, Terrain.MOUNTAIN: GRAY}
         return colors.get(terrain_type, BLACK)
 
     def is_walkable(self, x, y):
-        """Kontroluje, zda je terén průchozí"""
         if 0 <= x < WIDTH // CELL_SIZE and 0 <= y < HEIGHT // CELL_SIZE:
             return self.grid[y][x] not in [Terrain.WATER, Terrain.MOUNTAIN]
         return False
 
 
 class Food:
-    """Třída pro potravu"""
-
     def __init__(self, x, y):
         self.x = x
         self.y = y
 
 
 class Village:
-    """Třída pro vesnice - centrum civilizace"""
-
     def __init__(self, x, y, race):
         self.x = x
         self.y = y
-        self.race = race  # rasa, která vesnici založila
+        self.race = race
         self.population = 1
-        self.level = 1  # úroveň rozvoje (1-3)
+        self.level = 1
 
     def grow(self):
-        """Růst vesnice podle populace - lehčí růst"""
         if self.population > 5 and self.level < 2:
             self.level = 2
         elif self.population > 12 and self.level < 3:
@@ -115,8 +179,6 @@ class Village:
 
 
 class Agent:
-    """Třída pro agenty - různé rasy s vlastnostmi"""
-    # Různé rasy
     HUMAN = "Human"
     ELF = "Elf"
     DWARF = "Dwarf"
@@ -126,101 +188,69 @@ class Agent:
         self.x = x
         self.y = y
         self.race = race or random.choice([Agent.HUMAN, Agent.ELF, Agent.DWARF, Agent.ORC])
-        self.energy = 100  # Zvýšená počáteční energie
+        self.energy = settings.initial_energy
         self.age = 0
         self.max_age = self.get_max_age()
-        self.village = None  # příslušnost k vesnici
+        self.village = None
         self.color = self.get_race_color()
         self.strength = self.get_race_strength()
         self.speed = self.get_race_speed()
 
     def get_max_age(self):
-        """Maximální věk podle rasy - delší životy"""
-        ages = {
-            Agent.HUMAN: 500,
-            Agent.ELF: 800,
-            Agent.DWARF: 600,
-            Agent.ORC: 400
-        }
+        ages = {Agent.HUMAN: settings.human_max_age, Agent.ELF: settings.elf_max_age,
+                Agent.DWARF: settings.dwarf_max_age, Agent.ORC: settings.orc_max_age}
         return ages.get(self.race, 500)
 
     def get_race_color(self):
-        """Barva podle rasy"""
-        colors = {
-            Agent.HUMAN: RED,
-            Agent.ELF: GREEN,
-            Agent.DWARF: BROWN,
-            Agent.ORC: GRAY
-        }
+        colors = {Agent.HUMAN: RED, Agent.ELF: GREEN, Agent.DWARF: BROWN, Agent.ORC: GRAY}
         return colors.get(self.race, WHITE)
 
     def get_race_strength(self):
-        """Síla podle rasy (pro boj)"""
-        strength = {
-            Agent.HUMAN: 5,
-            Agent.ELF: 4,
-            Agent.DWARF: 6,
-            Agent.ORC: 7
-        }
+        strength = {Agent.HUMAN: settings.human_strength, Agent.ELF: settings.elf_strength,
+                    Agent.DWARF: settings.dwarf_strength, Agent.ORC: settings.orc_strength}
         return strength.get(self.race, 5)
 
     def get_race_speed(self):
-        """Rychlost podle rasy"""
-        speed = {
-            Agent.HUMAN: 1.0,
-            Agent.ELF: 1.2,
-            Agent.DWARF: 0.8,
-            Agent.ORC: 1.1
-        }
+        speed = {Agent.HUMAN: settings.human_speed, Agent.ELF: settings.elf_speed, Agent.DWARF: settings.dwarf_speed,
+                 Agent.ORC: settings.orc_speed}
         return speed.get(self.race, 1.0)
 
     def move(self, terrain):
-        """Pohyb agenta s respektováním terénu"""
         for _ in range(int(self.speed)):
             dx = random.choice([-1, 0, 1])
             dy = random.choice([-1, 0, 1])
             new_x = (self.x + dx) % (WIDTH // CELL_SIZE)
             new_y = (self.y + dy) % (HEIGHT // CELL_SIZE)
-
-            # Pohyb pouze po průchozím terénu
             if terrain.is_walkable(new_x, new_y):
                 self.x = new_x
                 self.y = new_y
-
-        self.energy -= 1.6  # úbytek energie
+        self.energy -= settings.energy_loss
         self.age += 1
 
     def eat(self, food_list):
-        """Konzumace potravy - větší dohled"""
         for food in food_list[:]:
-            # Hledání jídla v okolí 3 políček
-            if abs(self.x - food.x) <= 3 and abs(self.y - food.y) <= 3:
-                self.energy = min(self.energy + 35, 120)  # Více energie z jídla, max 120
+            if abs(self.x - food.x) <= settings.food_search_radius and abs(
+                    self.y - food.y) <= settings.food_search_radius:
+                self.energy = min(self.energy + settings.energy_from_food, settings.max_energy)
                 food_list.remove(food)
                 break
 
     def reproduce(self, agents_list, terrain):
-        """Rozmnožování agentů - lehčí podmínky"""
-        if self.energy >= 40 and self.age < self.max_age * 0.9 and self.age > 20:
-            # Kontrola, aby nedošlo k přelidnění
+        if (
+                self.energy >= settings.reproduction_energy and self.age < self.max_age * settings.max_reproduction_age_ratio and self.age > settings.min_reproduction_age):
             nearby_agents = sum(
                 1 for a in agents_list if abs(a.x - self.x) <= 5 and abs(a.y - self.y) <= 5 and a.race == self.race)
-
-            if nearby_agents < 15 and random.random() < 0.08:  # Omezení růstu populace
-                self.energy -= 15  # Menší úbytek energie
-                # Potomek stejné rasy
+            if nearby_agents < settings.max_nearby_agents and random.random() < settings.reproduction_chance:
+                self.energy -= settings.reproduction_cost
                 child = Agent(self.x, self.y, self.race)
                 child.village = self.village
                 agents_list.append(child)
 
     def fight(self, other_agent):
-        """Souboj mezi agenty různých ras - méně smrtelné"""
         if self.race != other_agent.race:
-            # Nižší šance na smrt v boji
-            if random.random() < 0.3:  # Pouze 30% šance na smrt
+            if random.random() < settings.fight_death_chance:
                 my_power = self.strength + random.randint(0, 3)
                 enemy_power = other_agent.strength + random.randint(0, 3)
-
                 if my_power > enemy_power:
                     return other_agent
                 elif enemy_power > my_power:
@@ -228,53 +258,39 @@ class Agent:
         return None
 
     def build_village(self, villages, terrain):
-        """Zakládání vesnice - lehčí podmínky"""
-        if self.energy >= 30 and not self.village:  # Nižší požadavek na energii
+        if self.energy >= settings.village_energy_cost and not self.village:
             if terrain.is_walkable(self.x, self.y):
-                # Kontrola, zda není poblíž jiná vesnice
                 for v in villages:
                     dist = math.sqrt((self.x - v.x) ** 2 + (self.y - v.y) ** 2)
-                    if dist < 6:  # Menší minimální vzdálenost
+                    if dist < settings.village_min_distance:
                         return
-
-                # Založení nové vesnice
                 village = Village(self.x, self.y, self.race)
                 villages.append(village)
                 self.village = village
-                self.energy -= 15  # Menší úbytek energie
+                self.energy -= settings.village_build_cost
 
 
 class Disaster:
-    """Třída pro přírodní katastrofy"""
-    METEOR = "Meteor"
-    LIGHTNING = "Lightning"
-
     @staticmethod
     def meteor_strike(x, y, agents, terrain):
-        """Dopad meteoru - ničí agenty v oblasti"""
         casualties = []
-        radius = 3
+        radius = settings.meteor_radius
         for agent in agents[:]:
             dist = math.sqrt((agent.x - x) ** 2 + (agent.y - y) ** 2)
             if dist < radius:
                 casualties.append(agent)
-
         for agent in casualties:
             agents.remove(agent)
-
-        # Poškození terénu
         for dx in range(-radius, radius):
             for dy in range(-radius, radius):
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < WIDTH // CELL_SIZE and 0 <= ny < HEIGHT // CELL_SIZE:
                     if (dx * dx + dy * dy) < radius * radius:
                         terrain.grid[ny][nx] = Terrain.SAND
-
         return len(casualties)
 
     @staticmethod
     def lightning_strike(x, y, agents):
-        """Blesk - zabíjí agenta na pozici"""
         for agent in agents[:]:
             if agent.x == x and agent.y == y:
                 agents.remove(agent)
@@ -282,31 +298,23 @@ class Disaster:
         return False
 
 
-# --- HLAVNÍ HRA ---
-
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("WorldBox Simulátor")
+    pygame.display.set_caption("WorldBox Simulátor s Menu")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont(None, 24)
 
-    # Inicializace světa
     terrain = Terrain()
     agents = []
     food = []
     villages = []
 
-    # Počáteční populace - každá rasa v jednom rohu
-    races_positions = [
-        (Agent.HUMAN, 5, 5),  # Levý horní roh
-        (Agent.ELF, WIDTH // CELL_SIZE - 6, 5),  # Pravý horní roh
-        (Agent.DWARF, 5, HEIGHT // CELL_SIZE - 6),  # Levý dolní roh
-        (Agent.ORC, WIDTH // CELL_SIZE - 6, HEIGHT // CELL_SIZE - 6)  # Pravý dolní roh
-    ]
+    races_positions = [(Agent.HUMAN, 5, 5), (Agent.ELF, WIDTH // CELL_SIZE - 6, 5),
+                       (Agent.DWARF, 5, HEIGHT // CELL_SIZE - 6),
+                       (Agent.ORC, WIDTH // CELL_SIZE - 6, HEIGHT // CELL_SIZE - 6)]
 
     for race, base_x, base_y in races_positions:
-        # Vytvoření 12 agentů každé rasy v jejich rohu
         for _ in range(12):
             x = base_x + random.randint(-3, 3)
             y = base_y + random.randint(-3, 3)
@@ -315,42 +323,71 @@ def main():
             if terrain.is_walkable(x, y):
                 agents.append(Agent(x, y, race))
 
-    # Počáteční potrava - mnohem více
-    for _ in range(400):
+    for _ in range(int(settings.initial_food)):
         x = random.randint(0, WIDTH // CELL_SIZE - 1)
         y = random.randint(0, HEIGHT // CELL_SIZE - 1)
         if terrain.is_walkable(x, y):
             food.append(Food(x, y))
 
-    # Herní proměnné
     running = True
     paused = False
     selected_tool = None
-    frame_count = 0
+    show_menu = False
 
-    # Nástroje pro interakci
-    TOOLS = {
-        "add_human": "1",
-        "add_elf": "2",
-        "add_dwarf": "3",
-        "add_orc": "4",
-        "meteor": "M",
-        "lightning": "L",
-        "food": "F"
-    }
+    menu_x = 50
+    menu_y = 100
+    slider_width = 300
+    slider_height = 20
+    slider_spacing = 50
+
+    sliders = [
+        Slider(menu_x, menu_y, slider_width, slider_height, 20, 200, settings.initial_energy, "Počáteční energie", 5),
+        Slider(menu_x, menu_y + slider_spacing, slider_width, slider_height, 10, 100, settings.energy_from_food,
+               "Energie z jídla", 5),
+        Slider(menu_x, menu_y + slider_spacing * 2, slider_width, slider_height, 0.5, 5.0, settings.energy_loss,
+               "Úbytek energie", 0.1),
+        Slider(menu_x, menu_y + slider_spacing * 3, slider_width, slider_height, 0.01, 0.3,
+               settings.reproduction_chance, "Šance rozmnožení", 0.01),
+        Slider(menu_x, menu_y + slider_spacing * 4, slider_width, slider_height, 0.0, 0.5, settings.fight_death_chance,
+               "Smrtelnost bojů", 0.05),
+        Slider(menu_x, menu_y + slider_spacing * 5, slider_width, slider_height, 0.1, 2.0, settings.food_spawn_chance,
+               "Rychlost jídla", 0.1),
+        Slider(menu_x + 400, menu_y, slider_width, slider_height, 200, 1000, settings.human_max_age, "Human věk", 50),
+        Slider(menu_x + 400, menu_y + slider_spacing, slider_width, slider_height, 300, 1500, settings.elf_max_age,
+               "Elf věk", 50),
+        Slider(menu_x + 400, menu_y + slider_spacing * 2, slider_width, slider_height, 200, 1200,
+               settings.dwarf_max_age, "Dwarf věk", 50),
+        Slider(menu_x + 400, menu_y + slider_spacing * 3, slider_width, slider_height, 100, 800, settings.orc_max_age,
+               "Orc věk", 50),
+        Slider(menu_x + 400, menu_y + slider_spacing * 4, slider_width, slider_height, 1, 15, settings.human_strength,
+               "Human síla", 1),
+        Slider(menu_x + 400, menu_y + slider_spacing * 5, slider_width, slider_height, 1, 15, settings.elf_strength,
+               "Elf síla", 1),
+        Slider(menu_x + 800, menu_y, slider_width, slider_height, 1, 15, settings.dwarf_strength, "Dwarf síla", 1),
+        Slider(menu_x + 800, menu_y + slider_spacing, slider_width, slider_height, 1, 15, settings.orc_strength,
+               "Orc síla", 1),
+        Slider(menu_x + 800, menu_y + slider_spacing * 2, slider_width, slider_height, 0.5, 3.0, settings.human_speed,
+               "Human rychlost", 0.1),
+        Slider(menu_x + 800, menu_y + slider_spacing * 3, slider_width, slider_height, 0.5, 3.0, settings.elf_speed,
+               "Elf rychlost", 0.1),
+        Slider(menu_x + 800, menu_y + slider_spacing * 4, slider_width, slider_height, 0.5, 3.0, settings.dwarf_speed,
+               "Dwarf rychlost", 0.1),
+        Slider(menu_x + 800, menu_y + slider_spacing * 5, slider_width, slider_height, 0.5, 3.0, settings.orc_speed,
+               "Orc rychlost", 0.1),
+    ]
 
     while running:
-        # --- UDÁLOSTI ---
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-
-            elif event.type == pygame.KEYDOWN:
-                # Pauza
+            if show_menu:
+                for slider in sliders:
+                    slider.handle_event(event)
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     paused = not paused
-
-                # Výběr nástrojů
+                elif event.key == pygame.K_TAB:
+                    show_menu = not show_menu
                 elif event.key == pygame.K_1:
                     selected_tool = "add_human"
                 elif event.key == pygame.K_2:
@@ -367,13 +404,10 @@ def main():
                     selected_tool = "food"
                 elif event.key == pygame.K_ESCAPE:
                     selected_tool = None
-
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                # Použití nástroje
+            elif event.type == pygame.MOUSEBUTTONDOWN and not show_menu:
                 mouse_x, mouse_y = pygame.mouse.get_pos()
                 grid_x = mouse_x // CELL_SIZE
                 grid_y = mouse_y // CELL_SIZE
-
                 if selected_tool and terrain.is_walkable(grid_x, grid_y):
                     if selected_tool == "add_human":
                         agents.append(Agent(grid_x, grid_y, Agent.HUMAN))
@@ -390,52 +424,55 @@ def main():
                     elif selected_tool == "food":
                         food.append(Food(grid_x, grid_y))
 
-        # --- LOGIKA (pokud není pauza) ---
-        if not paused:
-            frame_count += 1
+        settings.initial_energy = sliders[0].value
+        settings.energy_from_food = sliders[1].value
+        settings.energy_loss = sliders[2].value
+        settings.reproduction_chance = sliders[3].value
+        settings.fight_death_chance = sliders[4].value
+        settings.food_spawn_chance = sliders[5].value
+        settings.human_max_age = sliders[6].value
+        settings.elf_max_age = sliders[7].value
+        settings.dwarf_max_age = sliders[8].value
+        settings.orc_max_age = sliders[9].value
+        settings.human_strength = sliders[10].value
+        settings.elf_strength = sliders[11].value
+        settings.dwarf_strength = sliders[12].value
+        settings.orc_strength = sliders[13].value
+        settings.human_speed = sliders[14].value
+        settings.elf_speed = sliders[15].value
+        settings.dwarf_speed = sliders[16].value
+        settings.orc_speed = sliders[17].value
 
-            # Akce agentů
+        if not paused and not show_menu:
             for agent in agents[:]:
                 agent.move(terrain)
                 agent.eat(food)
                 agent.reproduce(agents, terrain)
-
-                # Zakládání vesnic (častěji)
-                if random.random() < 0.005:  # 5x vyšší šance
+                if random.random() < settings.village_build_chance:
                     agent.build_village(villages, terrain)
-
-                # Smrt stářím nebo hladem
                 if agent.energy <= 0 or agent.age >= agent.max_age:
                     agents.remove(agent)
                     if agent.village:
                         agent.village.population -= 1
-
-            # Boje mezi agenty různých ras - méně časté a méně smrtelné
-            if random.random() < 0.3:  # Pouze 30% času probíhají boje
+            if random.random() < settings.fight_chance:
                 for i, agent1 in enumerate(agents[:]):
                     for agent2 in agents[i + 1:]:
                         if agent1.x == agent2.x and agent1.y == agent2.y:
                             loser = agent1.fight(agent2)
                             if loser and loser in agents:
                                 agents.remove(loser)
-
-            # Regenerace potravy - rychlejší a více
-            if len(food) < 500 and random.random() < 0.7:  # Vyšší limit a šance
+            if len(food) < settings.max_food and random.random() < settings.food_spawn_chance:
                 x = random.randint(0, WIDTH // CELL_SIZE - 1)
                 y = random.randint(0, HEIGHT // CELL_SIZE - 1)
                 if terrain.is_walkable(x, y):
                     food.append(Food(x, y))
-
-            # Růst vesnic
             for village in villages[:]:
                 village.population = sum(1 for a in agents if a.village == village)
                 if village.population == 0:
                     villages.remove(village)
                 else:
                     village.grow()
-
-            # Náhodné katastrofy (mnohem vzácnější)
-            if random.random() < 0.0001:  # 10x méně časté
+            if random.random() < settings.disaster_chance:
                 x = random.randint(0, WIDTH // CELL_SIZE - 1)
                 y = random.randint(0, HEIGHT // CELL_SIZE - 1)
                 if random.random() < 0.5:
@@ -443,74 +480,65 @@ def main():
                 else:
                     Disaster.lightning_strike(x, y, agents)
 
-        # --- VYKRESLENÍ ---
         screen.fill(BLACK)
 
-        # Vykreslení terénu
-        for y in range(len(terrain.grid)):
-            for x in range(len(terrain.grid[0])):
-                color = terrain.get_color(terrain.grid[y][x])
-                pygame.draw.rect(screen, color, (x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+        if not show_menu:
+            for y in range(len(terrain.grid)):
+                for x in range(len(terrain.grid[0])):
+                    color = terrain.get_color(terrain.grid[y][x])
+                    pygame.draw.rect(screen, color, (x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+            for f in food:
+                pygame.draw.rect(screen, YELLOW, (f.x * CELL_SIZE, f.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+            for v in villages:
+                size = v.level * 2
+                village_color = ORANGE if v.race == Agent.HUMAN else (
+                    GREEN if v.race == Agent.ELF else (BROWN if v.race == Agent.DWARF else PURPLE))
+                pygame.draw.rect(screen, village_color,
+                                 (v.x * CELL_SIZE - size, v.y * CELL_SIZE - size, CELL_SIZE + 2 * size,
+                                  CELL_SIZE + 2 * size), 2)
+            for a in agents:
+                pygame.draw.rect(screen, a.color, (a.x * CELL_SIZE, a.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
 
-        # Vykreslení potravy
-        for f in food:
-            pygame.draw.rect(screen, YELLOW, (f.x * CELL_SIZE, f.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+            y_offset = 10
+            race_counts = {race: sum(1 for a in agents if a.race == race) for race in
+                           [Agent.HUMAN, Agent.ELF, Agent.DWARF, Agent.ORC]}
+            race_colors = {Agent.HUMAN: RED, Agent.ELF: GREEN, Agent.DWARF: BROWN, Agent.ORC: GRAY}
 
-        # Vykreslení vesnic
-        for v in villages:
-            size = v.level * 2
-            village_color = ORANGE if v.race == Agent.HUMAN else (
-                GREEN if v.race == Agent.ELF else (BROWN if v.race == Agent.DWARF else PURPLE))
-            pygame.draw.rect(screen, village_color,
-                             (v.x * CELL_SIZE - size, v.y * CELL_SIZE - size, CELL_SIZE + 2 * size,
-                              CELL_SIZE + 2 * size), 2)
+            for race, count in race_counts.items():
+                pygame.draw.rect(screen, race_colors[race], (10, y_offset + 3, 15, 15))
+                text = font.render(f"{race}: {count}", True, WHITE)
+                screen.blit(text, (30, y_offset))
+                y_offset += 25
 
-        # Vykreslení agentů
-        for a in agents:
-            pygame.draw.rect(screen, a.color, (a.x * CELL_SIZE, a.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
-
-        # --- UI ---
-        y_offset = 10
-
-        # Statistiky podle ras
-        race_counts = {race: sum(1 for a in agents if a.race == race)
-                       for race in [Agent.HUMAN, Agent.ELF, Agent.DWARF, Agent.ORC]}
-
-        for race, count in race_counts.items():
-            text = font.render(f"{race}: {count}", True, WHITE)
+            text = font.render(f"Celkem: {len(agents)}", True, WHITE)
             screen.blit(text, (10, y_offset))
             y_offset += 25
+            text = font.render(f"Vesnice: {len(villages)}", True, WHITE)
+            screen.blit(text, (10, y_offset))
+            y_offset += 25
+            text = font.render(f"Jídlo: {len(food)}", True, WHITE)
+            screen.blit(text, (10, y_offset))
+            y_offset += 30
+            text = font.render("Nástroje: 1-Human 2-Elf 3-Dwarf 4-Orc", True, WHITE)
+            screen.blit(text, (10, y_offset))
+            y_offset += 20
+            text = font.render("M-Meteor L-Blesk F-Jídlo", True, WHITE)
+            screen.blit(text, (10, y_offset))
+            y_offset += 20
+            text = font.render("SPACE-Pauza TAB-Menu", True, YELLOW)
+            screen.blit(text, (10, y_offset))
 
-        # Celkový počet
-        text = font.render(f"Celkem: {len(agents)}", True, WHITE)
-        screen.blit(text, (10, y_offset))
-        y_offset += 25
-
-        text = font.render(f"Vesnice: {len(villages)}", True, WHITE)
-        screen.blit(text, (10, y_offset))
-        y_offset += 25
-
-        text = font.render(f"Jídlo: {len(food)}", True, WHITE)
-        screen.blit(text, (10, y_offset))
-        y_offset += 30
-
-        # Nástroje
-        text = font.render("Nástroje: 1-Human 2-Elf 3-Dwarf 4-Orc", True, WHITE)
-        screen.blit(text, (10, y_offset))
-        y_offset += 20
-
-        text = font.render("M-Meteor L-Blesk F-Jídlo SPACE-Pauza", True, WHITE)
-        screen.blit(text, (10, y_offset))
-
-        # Vybraný nástroj
-        if selected_tool:
-            text = font.render(f"Vybrán: {selected_tool}", True, YELLOW)
-            screen.blit(text, (WIDTH - 200, 10))
-
-        # Pauza
-        if paused:
-            text = font.render("PAUZA", True, RED)
-            screen.blit(text, (WIDTH // 2 - 40, HEIGHT // 2))
+            if selected_tool:
+                text = font.render(f"Vybrán: {selected_tool}", True, YELLOW)
+                screen.blit(text, (WIDTH - 250, 10))
+            if paused:
+                text = font.render("PAUZA", True, RED)
+                screen.blit(text, (WIDTH // 2 - 40, HEIGHT // 2))
+        else:
+            title = font.render("=== NASTAVENÍ PARAMETRŮ (TAB pro zavření) ===", True, YELLOW)
+            screen.blit(title, (WIDTH // 2 - 250, 30))
+            for slider in sliders:
+                slider.draw(screen, font)
 
         pygame.display.flip()
         clock.tick(FPS)
