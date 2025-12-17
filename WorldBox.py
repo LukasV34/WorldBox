@@ -19,7 +19,6 @@ SAND = (194, 178, 128)
 PURPLE = (128, 0, 128)
 ORANGE = (255, 165, 0)
 DARK_GRAY = (50, 50, 50)
-PURPLE = (128, 0, 128)
 
 
 class GameSettings:
