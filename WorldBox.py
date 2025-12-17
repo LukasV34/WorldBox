@@ -2,7 +2,7 @@ import pygame
 import random
 import math
 
-WIDTH, HEIGHT = 1500, 1000
+WIDTH, HEIGHT = 1400, 850
 CELL_SIZE = 10
 FPS = 30
 
@@ -19,6 +19,7 @@ SAND = (194, 178, 128)
 PURPLE = (128, 0, 128)
 ORANGE = (255, 165, 0)
 DARK_GRAY = (50, 50, 50)
+PURPLE = (128, 0, 128)
 
 
 class GameSettings:
@@ -202,7 +203,7 @@ class Agent:
         return ages.get(self.race, 500)
 
     def get_race_color(self):
-        colors = {Agent.HUMAN: RED, Agent.ELF: GREEN, Agent.DWARF: BROWN, Agent.ORC: GRAY}
+        colors = {Agent.HUMAN: RED, Agent.ELF: GREEN, Agent.DWARF: BROWN, Agent.ORC: PURPLE}
         return colors.get(self.race, WHITE)
 
     def get_race_strength(self):
@@ -502,7 +503,7 @@ def main():
             y_offset = 10
             race_counts = {race: sum(1 for a in agents if a.race == race) for race in
                            [Agent.HUMAN, Agent.ELF, Agent.DWARF, Agent.ORC]}
-            race_colors = {Agent.HUMAN: RED, Agent.ELF: GREEN, Agent.DWARF: BROWN, Agent.ORC: GRAY}
+            race_colors = {Agent.HUMAN: RED, Agent.ELF: GREEN, Agent.DWARF: BROWN, Agent.ORC: PURPLE}
 
             for race, count in race_counts.items():
                 pygame.draw.rect(screen, race_colors[race], (10, y_offset + 3, 15, 15))
